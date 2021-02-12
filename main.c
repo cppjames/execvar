@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-char count[] = {0xAA, 0xBB, 0xCC, 0xDD, 0x00};
+char count[] = {0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x00, 0x00, 0x00};
 const unsigned id[] = {0xFFFFFFAA, 0xFFFFFFBB, 0xFFFFFFCC, 0xFFFFFFDD};
 const char *read_error = "Could not open executable file for reading.";
 const char *write_error = "Could not open executable file for writing.";
@@ -21,7 +21,7 @@ static bool is_id_at(char *buffer, size_t index);
 static void error(const char *message) __attribute__((noreturn));
 
 int main(int argc, char **argv) {
-	unsigned char count = 0;
+	unsigned count = 0;
 	char *file_path = argv[0];
 
 	size_t size = file_size(file_path);
@@ -36,15 +36,15 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	count = buffer[index];
+	count = *((unsigned*)&buffer[index]);
 	count++;
-	buffer[index] = count;
+	*((unsigned*)&buffer[index]) = count;
 
 	fprintf(stdout, "%u\n", count);
 
 	// We must unlink the file, because otherwise Linux will not let us write to it.
 	unlink(file_path);
-	
+
 	write_file(file_path, buffer, size);
 	chmod(file_path, 0777);
 
