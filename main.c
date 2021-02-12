@@ -42,7 +42,9 @@ int main(int argc, char **argv) {
 
 	fprintf(stdout, "%u\n", count);
 
+	// We must unlink the file, because otherwise Linux will not let us write to it.
 	unlink(file_path);
+	
 	write_file(file_path, buffer, size);
 	chmod(file_path, 0777);
 
