@@ -1,6 +1,13 @@
 # execvar
-Test C program that counts the number of times it has been executed without using extra files by editing its own executable.
 
-I consider the code straightforward enough not to risk offending any advanced programmers by documenting it.
+This is a C program that counts the number of times it has been executed by modifying its own
+executable.
 
-**Note:** This program was **not** designed to support multiple architectures, operating systems, or executable formats. It was made solely for testing purposes. Therefore, the only machine it has been tested on is my own (gcc, ELF64, Manjaro Linux, Intel, little endian, etc. etc. etc.). Sorry!
+Note: this program is linux/elf only.
+
+### Documentation:
+
+`dladdr1` is used to find the program's base address in memory and reverse the PIE or ASLR address
+space randomization. After computing the address of the data in ELF virtual address space, the
+binary's ELF section headers are scanned to find the .data section containing the program data we're
+updating. We then rewrite the program executable file.
