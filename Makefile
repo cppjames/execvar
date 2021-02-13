@@ -1,2 +1,2 @@
 execvar: main.c
-	gcc main.c -o execvar -ldl -Wno-implicit-int -Wall -Wextra
+	gcc main.c -o execvar -ldl -Wall -Wextra
