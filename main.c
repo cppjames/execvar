@@ -27,7 +27,7 @@ static void error(const char *message) __attribute__((noreturn));
 int main(int argc, char **argv) {
 	char *file_path = argv[0];
 	size_t size = file_size(file_path);
-	char *buffer = (char*)calloc(size + 4, sizeof(char));
+	char *buffer = (char*)malloc(size);
 	read_all(file_path, buffer);
 
 	// get mapping base address and data's address in ELF virtual memory
