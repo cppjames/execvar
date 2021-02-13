@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#error "platform dependent code: only linux is supported."
+#endif
 #define _GNU_SOURCE
 #include <assert.h>
 #include <stdbool.h>
@@ -14,7 +17,7 @@
 extern _start;
 
 // needs at least 1 non-zero member in order to be put in .data
-char count_data[sizeof(int)+1] = {0, 0, 0, 0, 1};
+char count_data[5] = {0, 0, 0, 0, 1};
 const char *read_error = "Could not open executable file for reading";
 const char *write_error = "Could not open executable file for writing";
 
@@ -25,58 +28,55 @@ static void write_file(char *path, char *buffer, size_t size);
 static void error(const char *message) __attribute__((noreturn));
 
 int main(int argc, char **argv) {
+	// read the entire binary into memory, we have to fully rewrite the binary later
 	char *file_path = argv[0];
 	size_t size = file_size(file_path);
-	char *buffer = (char*)calloc(size + 4, sizeof(char));
+	char *buffer = (char*) malloc(size);
 	read_all(file_path, buffer);
 
-	// get mapping base address and data's address in ELF virtual memory
+	// map program memory space back to elf memory space
 	Dl_info info;
 	void *extra = NULL;
 	dladdr1(&_start, &info, &extra, RTLD_DL_LINKMAP);
 	struct link_map *map = extra;
-	uintptr_t base = (uintptr_t)map->l_addr;
-	uintptr_t count_addr = (uintptr_t)count_data - base;
+	uintptr_t base = (uintptr_t) map->l_addr;
+	uintptr_t count_addr = (uintptr_t) count_data - base;
 	int *count = (int*) count_data;
 	printf("count: %d\n", *count);
 
 	// parse elf header
-	Elf64_Ehdr header;
-	memcpy(&header, buffer, sizeof(header));
-	if(memcmp(header.e_ident, ELFMAG, SELFMAG) != 0) {
+	ElfW(Ehdr) *header = (ElfW(Ehdr)*) buffer;
+	if(memcmp(header->e_ident, ELFMAG, SELFMAG) != 0) {
 		error("Executable is not ELF");
 	}
-	// parse section headers
-	Elf64_Off e_shoff = header.e_shoff;
-	uint16_t e_shentsize = header.e_shentsize;
-	uint16_t e_shnum = header.e_shnum;
-	Elf64_Shdr block_header;
-	bool did_find_block = false;
+	// parse section headers and find the block containing count_data
+	ElfW(Off) e_shoff = header->e_shoff;
+	uint16_t e_shentsize = header->e_shentsize;
+	uint16_t e_shnum = header->e_shnum;
+	ElfW(Shdr) *block_header = NULL;
 	for(int i = 0; i < e_shnum; i++) {
-		Elf64_Shdr sheader;
-		memcpy(&sheader, buffer + e_shoff + i * e_shentsize, sizeof(sheader));
-		if(sheader.sh_type == SHT_PROGBITS || sheader.sh_type == SHT_NOBITS) { // data segment or bss
-			// if this section could contain the data we're looking for and it does contain the data...
-			if(count_addr > sheader.sh_addr && count_addr - sheader.sh_addr < sheader.sh_size) {
-				block_header = sheader;
-				did_find_block = true;
-				assert(sheader.sh_type != SHT_NOBITS); // we rely on the object being in .data; this is a development check
+		ElfW(Shdr) *s_header = (ElfW(Shdr)*)(buffer + e_shoff + i * e_shentsize);
+		if(s_header->sh_type == SHT_PROGBITS || s_header->sh_type == SHT_NOBITS) { // .data or .bss
+			// if this section contains the data we're searching for
+			if(count_addr > s_header->sh_addr && count_addr - s_header->sh_addr < s_header->sh_size) {
+				block_header = s_header;
+				// the object must be in .data; this is a development check
+				assert(s_header->sh_type != SHT_NOBITS);
 				break;
 			}
 		}
 	}
-	if(!did_find_block) {
+	if(block_header == NULL) {
 		error("internal error: unable to find object in program data");
 	}
-	// sanity check
-	int dummy;
-	memcpy(&dummy, buffer + block_header.sh_offset + (count_addr - block_header.sh_addr), sizeof(int));
-	assert(dummy == *count);
-	// update count and write back
-	(*count)++;
-	memcpy(buffer + block_header.sh_offset + (count_addr - block_header.sh_addr), count, sizeof(int));
 
-	// We must unlink the file, because otherwise Linux will not let us write to it.
+	// sanity check
+	int dummy = *(int*)(buffer + block_header->sh_offset + count_addr - block_header->sh_addr);
+	assert(dummy == *count);
+	// write back count + 1
+	*(int*)(buffer + block_header->sh_offset + count_addr - block_header->sh_addr) = *count + 1;
+
+	// can't update the executable, but we can unlink and rewrite
 	unlink(file_path);
 	write_file(file_path, buffer, size);
 	chmod(file_path, 0755);
