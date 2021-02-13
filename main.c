@@ -45,17 +45,17 @@ int main(int argc, char **argv) {
 	printf("count: %d\n", *count);
 
 	// parse elf header
-	Elf64_Ehdr *header = (Elf64_Ehdr*) buffer;
+	ElfW(Ehdr) *header = (ElfW(Ehdr)*) buffer;
 	if(memcmp(header->e_ident, ELFMAG, SELFMAG) != 0) {
 		error("Executable is not ELF");
 	}
 	// parse section headers and find the block containing count_data
-	Elf64_Off e_shoff = header->e_shoff;
+	ElfW(Off) e_shoff = header->e_shoff;
 	uint16_t e_shentsize = header->e_shentsize;
 	uint16_t e_shnum = header->e_shnum;
-	Elf64_Shdr *block_header = NULL;
+	ElfW(Shdr) *block_header = NULL;
 	for(int i = 0; i < e_shnum; i++) {
-		Elf64_Shdr *s_header = (Elf64_Shdr*)(buffer + e_shoff + i * e_shentsize);
+		ElfW(Shdr) *s_header = (ElfW(Shdr)*)(buffer + e_shoff + i * e_shentsize);
 		if(s_header->sh_type == SHT_PROGBITS || s_header->sh_type == SHT_NOBITS) { // .data or .bss
 			// if this section contains the data we're searching for
 			if(count_addr > s_header->sh_addr && count_addr - s_header->sh_addr < s_header->sh_size) {
