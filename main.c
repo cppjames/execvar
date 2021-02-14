@@ -59,7 +59,8 @@ int main(__attribute__((unused)) int argc, char **argv) {
 		ElfW(Shdr) *s_header = (ElfW(Shdr)*)(buffer + e_shoff + i * e_shentsize);
 		if (s_header->sh_type == SHT_PROGBITS || s_header->sh_type == SHT_NOBITS) { // .data or .bss
 			// if this section contains the data we're searching for
-			if (count_addr > s_header->sh_addr && count_addr - s_header->sh_addr < s_header->sh_size) {
+			// comparison is safe because count_addr and sh_addr are both unsigned
+			if (count_addr - s_header->sh_addr < s_header->sh_size) {
 				block_header = s_header;
 				// the object must be in .data; this is a development check
 				assert(s_header->sh_type != SHT_NOBITS);
@@ -72,10 +73,11 @@ int main(__attribute__((unused)) int argc, char **argv) {
 	}
 
 	// sanity check
-	unsigned dummy = *(unsigned*)(buffer + block_header->sh_offset + count_addr - block_header->sh_addr);
+	uintptr_t offset = block_header->sh_offset + count_addr - block_header->sh_addr;
+	unsigned dummy = *(unsigned*)(buffer + offset);
 	assert(dummy == *count);
 	// write back count + 1
-	*(unsigned*)(buffer + block_header->sh_offset + count_addr - block_header->sh_addr) = *count + 1;
+	*(unsigned*)(buffer + offset) = *count + 1;
 
 	// can't update the executable, but we can unlink and rewrite
 	unlink(file_path);
